@@ -1,54 +1,141 @@
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
-describe("NFT Minter", async () => {
+describe("NFT Marketplace", async () => {
   const TOKEN_METADATA_PROGRAM_ID = new anchor.web3.PublicKey(
     "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
   );
-
   const provider = await anchor.AnchorProvider.env();
   anchor.setProvider(provider);
   const payer = provider.wallet as anchor.Wallet;
   const program = anchor.workspace.NftMarket;
-  // const provider = anchor.AnchorProvider.env();
-  // anchor.setProvider(provider);
-  // const payer = provider.wallet as anchor.Wallet;
 
-  it("list!", async () => {
+  // it("list single NFT!", async () => {
+  //   // Testing constants
+  //   const saleAmount = 1 * anchor.web3.LAMPORTS_PER_SOL;
+  //   const mint: anchor.web3.PublicKey = new anchor.web3.PublicKey(
+  //     "B6ZPVgLCU9v5M3GjEqERn8bjYHvz4MCSeZFtgmsXFLP3"
+  //   );
+  //   const recipient = new anchor.web3.PublicKey(
+  //     "529jaB5PAPBaoDjtyoD4y55K8B11jWcFY878iQtUtoyt"
+  //   );
+  //   // Derive the associated token address account for the mint and payer.
+  //   const senderTokenAddress = getAssociatedTokenAddressSync(
+  //     mint,
+  //     payer.publicKey
+  //   );
+
+  //   const ownerTokenAddress = await anchor.utils.token.associatedAddress({
+  //     mint: mint,
+  //     owner: payer.publicKey,
+  //   });
+
+  //   let [nftInfo] = anchor.web3.PublicKey.findProgramAddressSync(
+  //     [Buffer.from("nft_info"), payer.publicKey.toBuffer(), mint.toBuffer()],
+  //     pg.PROGRAM_ID
+  //   );
+  //   let [RecipientAccount] = anchor.web3.PublicKey.findProgramAddressSync(
+  //     [Buffer.from("vault"), payer.publicKey.toBuffer(), mint.toBuffer()],
+  //     pg.PROGRAM_ID
+  //   );
+  //   const metadataAddress = (
+  //     await anchor.web3.PublicKey.findProgramAddressSync(
+  //       [
+  //         Buffer.from("metadata"),
+  //         TOKEN_METADATA_PROGRAM_ID.toBuffer(),
+  //         mint.toBuffer(),
+  //       ],
+  //       TOKEN_METADATA_PROGRAM_ID
+  //     )
+  //   )[0];
+  //   console.log(`metadataAddress Address: ${metadataAddress}`);
+  //   // console.log(`Request to sell NFT: ${mint} for ${saleAmount} lamports.`);
+  //   console.log(`Owner's Token Address: ${ownerTokenAddress}`);
+  // // console.log(`recepient's Token Address: ${RecipientAccount.toString()}`);
+
+  //   await program.methods
+  //     .createItem(new BN(100))
+  //     .accounts({
+  //       mint: mint,
+  //       ownerTokenAccount: ownerTokenAddress,
+  //       ownerAuthority: pg.wallet.publicKey,
+  //       recipientAccount: RecipientAccount,
+  //       nftInfoAccount: nftInfo,
+  //       nftMetadata: metadataAddress,
+  //       metadataProgram: TOKEN_METADATA_PROGRAM_ID,
+  //     })
+  //     // .signers([pg.wallet])
+  //     .rpc({ skipPreflight: true });
+  // });
+
+  // it("delist!", async () => {
+  //   // Testing constants
+  //   const mint: anchor.web3.PublicKey = new anchor.web3.PublicKey(
+  //     "B6ZPVgLCU9v5M3GjEqERn8bjYHvz4MCSeZFtgmsXFLP3"
+  //   );
+  //   const recipient = new anchor.web3.PublicKey(
+  //     "529jaB5PAPBaoDjtyoD4y55K8B11jWcFY878iQtUtoyt"
+  //   );
+
+  //   const ownerTokenAddress = await anchor.utils.token.associatedAddress({
+  //     mint: mint,
+  //     owner: pg.wallet.publicKey,
+  //   });
+  //   let [nftInfo] = anchor.web3.PublicKey.findProgramAddressSync(
+  //     [
+  //       Buffer.from("nft_info"),
+  //       pg.wallet.publicKey.toBuffer(),
+  //       mint.toBuffer(),
+  //     ],
+  //     pg.PROGRAM_ID
+  //   );
+  //   let [RecipientAccount] = anchor.web3.PublicKey.findProgramAddressSync(
+  //     [Buffer.from("vault"), pg.wallet.publicKey.toBuffer(), mint.toBuffer()],
+  //     pg.PROGRAM_ID
+  //   );
+  //   console.log(`Owner's Token Address: ${ownerTokenAddress}`);
+  //   console.log(`RecipientAccount's Token Address: ${RecipientAccount}`);
+  //   await program.methods
+  //     .removeItem()
+  //     .accounts({
+  //       mint: mint,
+  //       signer: pg.wallet.publicKey,
+  //       nftInfoAccount: nftInfo,
+  //       ownerTokenAccount: ownerTokenAddress,
+  //       recipientAccount: RecipientAccount,
+  //     })
+  //     // .signers([pg.wallet])
+  //     .rpc({ skipPreflight: true });
+  // });
+
+  it("purchase single NFT!", async () => {
     // Testing constants
     const saleAmount = 1 * anchor.web3.LAMPORTS_PER_SOL;
     const mint: anchor.web3.PublicKey = new anchor.web3.PublicKey(
       "B6ZPVgLCU9v5M3GjEqERn8bjYHvz4MCSeZFtgmsXFLP3"
     );
-    const recipient = new anchor.web3.PublicKey(
-      "529jaB5PAPBaoDjtyoD4y55K8B11jWcFY878iQtUtoyt"
+    const buyer = new anchor.web3.PublicKey(
+      "5MjuAE8spr7DidyaYg6uNhaJ7Jo5FYmwWodjRKyZDfuk"
     );
-    // Derive the associated token address account for the mint and payer.
-    const senderTokenAddress = getAssociatedTokenAddressSync(
-      mint,
-      payer.publicKey
-    );
-
-    // Derive the associated token address account for the mint and recipient.
-    const recepientTokenAddress = getAssociatedTokenAddressSync(
-      mint,
-      recipient
-    );
-
-    const ownerTokenAddress = await anchor.utils.token.associatedAddress({
-      mint: mint,
-      owner: payer.publicKey,
-    });
     const buyerTokenAddress = await anchor.utils.token.associatedAddress({
       mint: mint,
-      owner: recipient,
+      owner: buyer,
     });
-    let [stakeInfo] = anchor.web3.PublicKey.findProgramAddressSync(
-      [Buffer.from("stake_info"), payer.publicKey.toBuffer()],
+
+    const nft_owner = new anchor.web3.PublicKey(
+      "5MjuAE8spr7DidyaYg6uNhaJ7Jo5FYmwWodjRKyZDfuk"
+    );
+    // const ownerTokenAddress = await anchor.utils.token.associatedAddress({
+    //   mint: mint,
+    //   owner: payer.publicKey,
+    // });
+
+    let [nftInfo] = anchor.web3.PublicKey.findProgramAddressSync(
+      [Buffer.from("nft_info"), nft_owner.toBuffer(), mint.toBuffer()],
       pg.PROGRAM_ID
     );
-    let [StakeAccount] = anchor.web3.PublicKey.findProgramAddressSync(
-      [Buffer.from("vault"), payer.publicKey.toBuffer(), mint.toBuffer()],
+    let [programAccount] = anchor.web3.PublicKey.findProgramAddressSync(
+      [Buffer.from("vault"), nft_owner.toBuffer(), mint.toBuffer()],
       pg.PROGRAM_ID
     );
     const metadataAddress = (
@@ -63,62 +150,21 @@ describe("NFT Minter", async () => {
     )[0];
     console.log(`metadataAddress Address: ${metadataAddress}`);
     // console.log(`Request to sell NFT: ${mint} for ${saleAmount} lamports.`);
-    console.log(`Owner's Token Address: ${ownerTokenAddress}`);
     console.log(`Buyer's Token Address: ${buyerTokenAddress}`);
 
     await program.methods
-      .createItem(
-        "ZH",
-        "ZH",
-        "https://arweave.net/mYoq2DmUvil9Kw9lCzUzI75Q-uJ4BDVgqvPL4iw-GhQ"
-      )
+      .purchaseItem(new BN(100))
       .accounts({
+        signer: pg.wallet.publicKey,
         mint: mint,
-        ownerTokenAccount: ownerTokenAddress,
-        ownerAuthority: pg.wallet.publicKey,
-        recipientAccount: StakeAccount,
-        stakeInfoAccount: stakeInfo,
-        nftMetadata: metadataAddress,
-        metadataProgram: TOKEN_METADATA_PROGRAM_ID,
+        nftOwner: nft_owner,
+        buyerTokenAccount: buyerTokenAddress,
+        programNftAccount: programAccount,
+        nftInfoAccount: nftInfo,
       })
       // .signers([pg.wallet])
       .rpc({ skipPreflight: true });
   });
-  // it("delist!", async () => {
-  //   // Testing constants
-
-  //   const saleAmount = 1 * anchor.web3.LAMPORTS_PER_SOL;
-  //   const mint: anchor.web3.PublicKey = new anchor.web3.PublicKey(
-  //     "B6ZPVgLCU9v5M3GjEqERn8bjYHvz4MCSeZFtgmsXFLP3"
-  //   );
-  //   const recipient = new anchor.web3.PublicKey(
-  //     "529jaB5PAPBaoDjtyoD4y55K8B11jWcFY878iQtUtoyt"
-  //   );
-
-  //   const ownerTokenAddress = await anchor.utils.token.associatedAddress({
-  //     mint: mint,
-  //     // owner: payer.publicKey,
-  //     owner: pg.wallet.publicKey,
-  //   });
-
-  //   let [StakeAccount] = anchor.web3.PublicKey.findProgramAddressSync(
-  //     [Buffer.from("vault"), pg.wallet.publicKey.toBuffer(), mint.toBuffer()],
-  //     pg.PROGRAM_ID
-  //   );
-  //   console.log(`Request to sell NFT: ${mint} for ${saleAmount} lamports.`);
-  //   console.log(`Owner's Token Address: ${ownerTokenAddress}`);
-
-  //   await program.methods
-  //     .removeItem()
-  //     .accounts({
-  //       mint: mint,
-  //       signer: pg.wallet.publicKey,
-  //       ownerTokenAccount: ownerTokenAddress,
-  //       recipientAccount: StakeAccount,
-  //     })
-  //     // .signers([pg.wallet])
-  //     .rpc({ skipPreflight: true });
-  // });
 });
 /////////////////////////////
 
