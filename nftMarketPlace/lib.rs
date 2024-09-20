@@ -1,18 +1,12 @@
 use solana_program::clock::Clock;
 use solana_program::system_instruction;
 use {
-    anchor_lang::{prelude::*, system_program},
+    anchor_lang::prelude::*,
     anchor_spl::{
-        associated_token,
-        associated_token::{AssociatedToken, Create},
-        metadata::{
-            create_master_edition_v3, create_metadata_accounts_v3,
-            mpl_token_metadata::accounts::Metadata as MD, mpl_token_metadata::types::DataV2,
-            update_metadata_accounts_v2, CreateMasterEditionV3, CreateMetadataAccountsV3, Metadata,
-            UpdateMetadataAccountsV2,
-        },
-        token::spl_token::state::Account as AC,
-        token::{mint_to, transfer, Mint, MintTo, Token, TokenAccount, Transfer},
+        // associated_token,
+        associated_token::AssociatedToken,
+        token::spl_token::instruction::AuthorityType,
+        token::{set_authority, transfer, Mint, SetAuthority, Token, TokenAccount, Transfer},
     },
 };
 
@@ -24,16 +18,16 @@ pub mod constants {
 }
 pub const PREFIX: &str = "metadata";
 
-fn find_metadata_account(mint: &Pubkey) -> (Pubkey, u8) {
-    Pubkey::find_program_address(
-        &[
-            PREFIX.as_bytes(),
-            mpl_token_metadata::ID.as_ref(),
-            mint.as_ref(),
-        ],
-        &mpl_token_metadata::ID,
-    )
-}
+// fn find_metadata_account(mint: &Pubkey) -> (Pubkey, u8) {
+//     Pubkey::find_program_address(
+//         &[
+//             PREFIX.as_bytes(),
+//             mpl_token_metadata::ID.as_ref(),
+//             mint.as_ref(),
+//         ],
+//         &mpl_token_metadata::ID,
+//     )
+// }
 #[program]
 pub mod nft_market {
     use super::*;
@@ -41,9 +35,9 @@ pub mod nft_market {
         msg!("Transferring NFT...");
         let nft_info = &mut ctx.accounts.nft_info_account;
         // let md_account = find_metadata_account(&ctx.accounts.mint.key()).0;
-        let data = MD::try_from(&ctx.accounts.nft_metadata.to_account_info());
-        // let metadata_acc = MD::deserialize(&mut data.as_ref())?;
-        msg!(" metadata_acc  {:?}", data);
+        // let data = MD::try_from(&ctx.accounts.nft_metadata.to_account_info());
+        // // let metadata_acc = MD::deserialize(&mut data.as_ref())?;
+        // msg!(" metadata_acc  {:?}", data);
         let owner_tk_acc = &ctx.accounts.owner_token_account;
         let user = &ctx.accounts.owner_authority;
         let nft_mint = &ctx.accounts.mint;
@@ -64,16 +58,28 @@ pub mod nft_market {
         if owner_tk_acc.owner != user.key() {
             return Err(ErrorCode::MustBeOwnerOfNFT.into());
         }
-        transfer(
-            CpiContext::new(
-                ctx.accounts.token_program.to_account_info(),
-                Transfer {
-                    from: ctx.accounts.owner_token_account.to_account_info(),
-                    to: ctx.accounts.recipient_account.to_account_info(),
-                    authority: ctx.accounts.owner_authority.to_account_info(),
-                },
-            ),
-            1,
+        // transfer(
+        //     CpiContext::new(
+        //         ctx.accounts.token_program.to_account_info(),
+        //         Transfer {
+        //             from: ctx.accounts.owner_token_account.to_account_info(),
+        //             to: ctx.accounts.recipient_account.to_account_info(),
+        //             authority: ctx.accounts.owner_authority.to_account_info(),
+        //         },
+        //     ),
+        //     1,
+        // )?;
+        let cpi_context = CpiContext::new(
+            ctx.accounts.token_program.to_account_info(),
+            SetAuthority {
+                current_authority: ctx.accounts.owner_authority.to_account_info(),
+                account_or_mint: ctx.accounts.owner_token_account.to_account_info(),
+            },
+        );
+        set_authority(
+            cpi_context,
+            AuthorityType::AccountOwner, // authority type is AccountOwner
+            Some(ctx.accounts.recipient_account.key()),
         )?;
         let clock = Clock::get()?;
         nft_info.created_at = clock.slot;
@@ -109,8 +115,7 @@ pub mod nft_market {
             return Err(ErrorCode::WrongMintAccount.into());
         }
         let bump = ctx.bumps.recipient_account;
-        let signer: &[&[&[u8]]] =
-            &[&[constants::TOKEN_SEED, user.as_ref(), mint.as_ref(), &[bump]]];
+        let signer: &[&[&[u8]]] = &[&[constants::TOKEN_SEED, mint.as_ref(), &[bump]]];
         transfer(
             CpiContext::new_with_signer(
                 ctx.accounts.token_program.to_account_info(),
@@ -132,8 +137,6 @@ pub mod nft_market {
         msg!("Transferring amount...");
         let nft_info = &mut ctx.accounts.nft_info_account;
         let mint = ctx.accounts.mint.key();
-        let owner = nft_info.owner;
-        let receiver = &ctx.accounts.nft_owner;
         let buyer = &ctx.accounts.signer;
         if amount < nft_info.price {
             return Err(ErrorCode::WrongAmount.into());
@@ -150,12 +153,7 @@ pub mod nft_market {
         msg!("Transferring NFT...");
 
         let bump = ctx.bumps.program_nft_account;
-        let signer: &[&[&[u8]]] = &[&[
-            constants::TOKEN_SEED,
-            owner.as_ref(),
-            mint.as_ref(),
-            &[bump],
-        ]];
+        let signer: &[&[&[u8]]] = &[&[constants::TOKEN_SEED, mint.as_ref(), &[bump]]];
         // transfer sol to owner
 
         let transfer_instruction =
@@ -203,7 +201,7 @@ pub struct CreateItem<'info> {
     pub owner_token_account: Account<'info, TokenAccount>,
     #[account(
         init_if_needed,
-        seeds = [constants::TOKEN_SEED, owner_authority.key.as_ref(), mint.key().as_ref()],
+        seeds = [constants::TOKEN_SEED, mint.key().as_ref()],
         bump,
         payer = owner_authority, 
         token::mint = mint,
@@ -212,7 +210,7 @@ pub struct CreateItem<'info> {
     pub recipient_account: Account<'info, TokenAccount>,
     #[account(
      init_if_needed,
-     seeds = [constants::NFT_INFO_SEED, owner_authority.key.as_ref(),mint.key().as_ref()],
+     seeds = [constants::NFT_INFO_SEED, mint.key().as_ref()],
      bump,
     payer = owner_authority, 
     space = 8 + std::mem::size_of::<NftListInfo>()
@@ -221,18 +219,18 @@ pub struct CreateItem<'info> {
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
     pub associated_token_program: Program<'info, AssociatedToken>,
-    pub metadata_program: Program<'info, Metadata>,
-    #[account(
-        mut,
-        seeds = [
-            b"metadata".as_ref(),
-            metadata_program.key().as_ref(),
-            mint.key().as_ref(),
-        ],
-        bump,
-        seeds::program = metadata_program.key()
-    )]
-    pub nft_metadata: UncheckedAccount<'info>,
+    // pub metadata_program: Program<'info, Metadata>,
+    // #[account(
+    //     mut,
+    //     seeds = [
+    //         b"metadata".as_ref(),
+    //         metadata_program.key().as_ref(),
+    //         mint.key().as_ref(),
+    //     ],
+    //     bump,
+    //     seeds::program = metadata_program.key()
+    // )]
+    // pub nft_metadata: UncheckedAccount<'info>,
 }
 #[derive(Accounts)]
 pub struct RemoveItem<'info> {
@@ -247,13 +245,13 @@ pub struct RemoveItem<'info> {
     pub owner_token_account: Account<'info, TokenAccount>,
     #[account(
            mut,
-        seeds = [constants::TOKEN_SEED, signer.key.as_ref(), mint.key().as_ref()],
+        seeds = [constants::TOKEN_SEED, mint.key().as_ref()],
         bump,
     )]
     pub recipient_account: Account<'info, TokenAccount>,
     #[account(
      mut,
-     seeds = [constants::NFT_INFO_SEED, signer.key.as_ref(), mint.key().as_ref()],
+     seeds = [constants::NFT_INFO_SEED, mint.key().as_ref()],
      bump,
       )]
     pub nft_info_account: Account<'info, NftListInfo>,
@@ -276,14 +274,14 @@ pub struct PurchaseItem<'info> {
     pub buyer_token_account: Account<'info, TokenAccount>,
     #[account(
         mut,
-        seeds = [constants::TOKEN_SEED, nft_owner.key.as_ref(), mint.key().as_ref()],
+        seeds = [constants::TOKEN_SEED, mint.key().as_ref()],
         bump,
     )]
     pub program_nft_account: Account<'info, TokenAccount>,
 
     #[account(
      mut,
-     seeds = [constants::NFT_INFO_SEED, nft_owner.key.as_ref(), mint.key().as_ref()],
+     seeds = [constants::NFT_INFO_SEED, mint.key().as_ref()],
      bump,
       )]
     pub nft_info_account: Account<'info, NftListInfo>,
@@ -326,4 +324,3 @@ pub enum ErrorCode {
     #[msg("Not Avaiable")]
     NotAvaiable,
 }
-//new
