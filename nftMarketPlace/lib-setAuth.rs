@@ -2,6 +2,7 @@ use solana_program::clock::Clock;
 use solana_program::system_instruction;
 use {
     anchor_lang::prelude::*,
+    anchor_lang::system_program::{transfer as Systransfer, Transfer as SysTransfer},
     anchor_spl::{
         // associated_token,
         associated_token::AssociatedToken,
@@ -14,13 +15,13 @@ declare_id!("529jaB5PAPBaoDjtyoD4y55K8B11jWcFY878iQtUtoyt");
 pub mod constants {
     pub const TOKEN_SEED: &[u8] = b"vault";
     pub const NFT_INFO_SEED: &[u8] = b"nft_info";
-    pub const PDA_SEED: &[u8] = b"pda";
+    pub const PDA_SEED: &[u8] = b"marketplace_pda_seed";
 }
 
 #[program]
 pub mod nft_market {
     use super::*;
-    pub fn create_item(ctx: Context<CreateItem>, amount: u64) -> Result<()> {
+    pub fn create_item(ctx: Context<CreateItem>, amount: u64, fund_lamports: u64) -> Result<()> {
         msg!("Transferring NFT...");
         let nft_info = &mut ctx.accounts.nft_info_account;
         let owner_tk_acc = &ctx.accounts.owner_token_account;
@@ -39,6 +40,26 @@ pub mod nft_market {
         if owner_tk_acc.owner != user.key() {
             return Err(ErrorCode::MustBeOwnerOfNFT.into()); //check if user owns account
         }
+        //crate acc and transfer fund
+        let pda = &mut ctx.accounts.pda_account;
+        let signer = &mut ctx.accounts.owner_authority;
+        let system_program = &ctx.accounts.system_program;
+        let pda_balance_before = pda.get_lamports();
+        Systransfer(
+            CpiContext::new(
+                system_program.to_account_info(),
+                SysTransfer {
+                    from: signer.to_account_info(),
+                    to: pda.to_account_info(),
+                },
+            ),
+            fund_lamports,
+        )?;
+
+        let pda_balance_after = pda.get_lamports();
+
+        require_eq!(pda_balance_after, pda_balance_before + fund_lamports);
+
         let cpi_context = CpiContext::new(
             ctx.accounts.token_program.to_account_info(),
             SetAuthority {
@@ -101,54 +122,49 @@ pub mod nft_market {
         msg!("NFT transferred successfully.");
         Ok(())
     }
-
     pub fn purchase_item(ctx: Context<PurchaseItem>, amount: u64) -> Result<()> {
-        msg!("Transferring amount...");
         let nft_info = &mut ctx.accounts.nft_info_account;
-        let mint = ctx.accounts.mint.key();
         let buyer = &ctx.accounts.signer;
         if amount < nft_info.price {
             return Err(ErrorCode::WrongAmount.into());
         }
-        // check if nft is listed
-        if nft_info.is_listed == false {
-            return Err(ErrorCode::NFTNotListed.into());
+        if nft_info.is_listed != true {
+            return Err(ErrorCode::NFTNotListed.into()); // check if nft is listed
         }
-        // check if nft is sole
         if nft_info.sold == true {
-            return Err(ErrorCode::NFTSold.into());
+            return Err(ErrorCode::NFTSold.into()); // check if nft is sold
         }
-
         msg!("Transferring NFT...");
 
-        // let bump = ctx.bumps.program_nft_account;
-        // let signer: &[&[&[u8]]] = &[&[constants::TOKEN_SEED, mint.as_ref(), &[bump]]];
-        // transfer sol to owner
+        let bump = &[ctx.bumps.pda_account];
+        let seeds: &[&[u8]] = &[constants::PDA_SEED, bump];
+        let signer_seeds = &[&seeds[..]];
 
-        // let transfer_instruction =
-        //     system_instruction::transfer(&buyer.key(), &nft_info.owner.key(), nft_info.price);
-        // // Invoke the transfer instruction
-        // anchor_lang::solana_program::program::invoke_signed(
-        //     &transfer_instruction,
-        //     &[
-        //         ctx.accounts.signer.to_account_info(),
-        //         ctx.accounts.nft_owner.to_account_info(),
-        //         ctx.accounts.system_program.to_account_info(),
-        //     ],
-        //     &[],
-        // )?;
-        // transfer(
-        //     CpiContext::new_with_signer(
-        //         ctx.accounts.token_program.to_account_info(),
-        //         Transfer {
-        //             from: ctx.accounts.program_nft_account.to_account_info(),
-        //             to: ctx.accounts.buyer_token_account.to_account_info(),
-        //             authority: ctx.accounts.program_nft_account.to_account_info(),
-        //         },
-        //         signer,
-        //     ),
-        //     1,
-        // )?;
+        // // transfer sol to owner
+        let transfer_instruction =
+            system_instruction::transfer(&buyer.key(), &nft_info.owner.key(), nft_info.price);
+        // Invoke the transfer instruction
+        anchor_lang::solana_program::program::invoke_signed(
+            &transfer_instruction,
+            &[
+                ctx.accounts.signer.to_account_info(),
+                ctx.accounts.nft_owner.to_account_info(),
+                ctx.accounts.system_program.to_account_info(),
+            ],
+            &[],
+        )?;
+        transfer(
+            CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                Transfer {
+                    from: ctx.accounts.owner_token_account.to_account_info(),
+                    to: ctx.accounts.buyer_token_account.to_account_info(),
+                    authority: ctx.accounts.pda_account.to_account_info(),
+                },
+                signer_seeds,
+            ),
+            1,
+        )?;
         nft_info.sold = true;
         nft_info.owner = buyer.key();
         nft_info.is_listed = false;
@@ -169,14 +185,11 @@ pub struct CreateItem<'info> {
       )]
     pub owner_token_account: Account<'info, TokenAccount>,
     #[account(
-    init_if_needed,
+    mut,
     seeds = [constants::PDA_SEED],
-    bump,
-    payer = owner_authority, 
-    token::mint = mint,
-    token::authority = pda_account
+    bump
     )]
-    pub pda_account: Account<'info, TokenAccount>,
+    pub pda_account: SystemAccount<'info>,
     #[account(
      init_if_needed,
      seeds = [constants::NFT_INFO_SEED, mint.key().as_ref()],
@@ -200,8 +213,7 @@ pub struct RemoveItem<'info> {
      seeds = [constants::PDA_SEED],
      bump
     )]
-    pub pda_account: Account<'info, TokenAccount>,
-    // pub pda_account: SystemAccount<'info>,
+    pub pda_account: SystemAccount<'info>,
     #[account(mut)]
     pub owner_token_account: Account<'info, TokenAccount>,
     #[account(
@@ -222,23 +234,16 @@ pub struct PurchaseItem<'info> {
     pub mint: Account<'info, Mint>,
     #[account(mut)]
     pub nft_owner: AccountInfo<'info>,
-    #[account(mut,
-        associated_token::mint = mint,
-        associated_token::authority = signer,
-      )]
+    #[account(mut)]
     pub buyer_token_account: Account<'info, TokenAccount>,
-    // #[account(
-    //     mut,
-    //     seeds = [constants::TOKEN_SEED, mint.key().as_ref()],
-    //     bump,
-    // )]
-    // pub program_nft_account: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub owner_token_account: Account<'info, TokenAccount>,
     #[account(
     mut,
      seeds = [constants::PDA_SEED],
      bump
     )]
-    pub pda_account: Account<'info, TokenAccount>,
+    pub pda_account: SystemAccount<'info>,
     #[account(
      mut,
      seeds = [constants::NFT_INFO_SEED, mint.key().as_ref()],
