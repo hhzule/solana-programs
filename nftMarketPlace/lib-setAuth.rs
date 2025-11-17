@@ -14,9 +14,9 @@ use {
 declare_id!("529jaB5PAPBaoDjtyoD4y55K8B11jWcFY878iQtUtoyt");
 pub mod constants {
     pub const TOKEN_SEED: &[u8] = b"vault";
-    pub const NFT_INFO_SEED: &[u8] = b"nft_info";
-    pub const PDA_SEED: &[u8] = b"marketplace_pda_seed";
-    pub const FACTORY_CONFIG: &[u8] = b"factory_config";
+    pub const NFT_INFO_SEED: &[u8] = b"nftinfo";
+    pub const PDA_SEED: &[u8] = b"marketplace_pdaseed";
+    pub const FACTORY_CONFIG: &[u8] = b"factoryconfig";
 }
 
 #[program]
